@@ -33,7 +33,7 @@
 #include <linux/input.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-
+#include <linux/version.h>
 #include <linux/ioport.h>
 #include <asm/io.h>
 
@@ -42,7 +42,11 @@ MODULE_AUTHOR("Matthieu Proucelle");
 MODULE_DESCRIPTION("GPIO and MCP23017 Arcade Joystick Driver");
 MODULE_LICENSE("GPL");
 
-#define MK_MAX_DEVICES		9
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,15,0)
+#define HAVE_TIMER_SETUP
+#endif
+
+#define MK_MAX_DEVICES        9
 
 #ifdef RPI2
 #define PERI_BASE        0x3F000000
@@ -61,16 +65,16 @@ MODULE_LICENSE("GPL");
 #define GPIO_SET *(gpio+7)
 #define GPIO_CLR *(gpio+10)
 
-#define BSC1_BASE		(PERI_BASE + 0x804000)
+#define BSC1_BASE        (PERI_BASE + 0x804000)
 
 
 /*
  * MCP23017 Defines
  */
-#define MPC23017_GPIOA_MODE		0x00
-#define MPC23017_GPIOB_MODE		0x01
-#define MPC23017_GPIOA_PULLUPS_MODE	0x0c
-#define MPC23017_GPIOB_PULLUPS_MODE	0x0d
+#define MPC23017_GPIOA_MODE        0x00
+#define MPC23017_GPIOB_MODE        0x01
+#define MPC23017_GPIOA_PULLUPS_MODE    0x0c
+#define MPC23017_GPIOB_PULLUPS_MODE    0x0d
 #define MPC23017_GPIOA_READ             0x12
 #define MPC23017_GPIOB_READ             0x13
 
@@ -78,35 +82,35 @@ MODULE_LICENSE("GPL");
  * Defines for I2C peripheral (aka BSC, or Broadcom Serial Controller)
  */
 
-#define BSC1_C		*(bsc1 + 0x00)
-#define BSC1_S		*(bsc1 + 0x01)
-#define BSC1_DLEN	*(bsc1 + 0x02)
-#define BSC1_A		*(bsc1 + 0x03)
-#define BSC1_FIFO	*(bsc1 + 0x04)
+#define BSC1_C        *(bsc1 + 0x00)
+#define BSC1_S        *(bsc1 + 0x01)
+#define BSC1_DLEN    *(bsc1 + 0x02)
+#define BSC1_A        *(bsc1 + 0x03)
+#define BSC1_FIFO    *(bsc1 + 0x04)
 
-#define BSC_C_I2CEN	(1 << 15)
-#define BSC_C_INTR	(1 << 10)
-#define BSC_C_INTT	(1 << 9)
-#define BSC_C_INTD	(1 << 8)
-#define BSC_C_ST	(1 << 7)
-#define BSC_C_CLEAR	(1 << 4)
-#define BSC_C_READ	1
+#define BSC_C_I2CEN    (1 << 15)
+#define BSC_C_INTR    (1 << 10)
+#define BSC_C_INTT    (1 << 9)
+#define BSC_C_INTD    (1 << 8)
+#define BSC_C_ST    (1 << 7)
+#define BSC_C_CLEAR    (1 << 4)
+#define BSC_C_READ    1
 
-#define START_READ	BSC_C_I2CEN|BSC_C_ST|BSC_C_CLEAR|BSC_C_READ
-#define START_WRITE	BSC_C_I2CEN|BSC_C_ST
+#define START_READ    BSC_C_I2CEN|BSC_C_ST|BSC_C_CLEAR|BSC_C_READ
+#define START_WRITE    BSC_C_I2CEN|BSC_C_ST
 
-#define BSC_S_CLKT	(1 << 9)
-#define BSC_S_ERR	(1 << 8)
-#define BSC_S_RXF	(1 << 7)
-#define BSC_S_TXE	(1 << 6)
-#define BSC_S_RXD	(1 << 5)
-#define BSC_S_TXD	(1 << 4)
-#define BSC_S_RXR	(1 << 3)
-#define BSC_S_TXW	(1 << 2)
-#define BSC_S_DONE	(1 << 1)
-#define BSC_S_TA	1
+#define BSC_S_CLKT    (1 << 9)
+#define BSC_S_ERR    (1 << 8)
+#define BSC_S_RXF    (1 << 7)
+#define BSC_S_TXE    (1 << 6)
+#define BSC_S_RXD    (1 << 5)
+#define BSC_S_TXD    (1 << 4)
+#define BSC_S_RXR    (1 << 3)
+#define BSC_S_TXW    (1 << 2)
+#define BSC_S_DONE    (1 << 1)
+#define BSC_S_TA    1
 
-#define CLEAR_STATUS	BSC_S_CLKT|BSC_S_ERR|BSC_S_DONE
+#define CLEAR_STATUS    BSC_S_CLKT|BSC_S_ERR|BSC_S_DONE
 
 static volatile unsigned *gpio;
 static volatile unsigned *bsc1;
@@ -141,7 +145,7 @@ enum mk_type {
     MK_MAX
 };
 
-#define MK_REFRESH_TIME	HZ/100
+#define MK_REFRESH_TIME    HZ/100
 
 struct mk_pad {
     struct input_dev *dev;
@@ -182,11 +186,11 @@ static const int mk_max_arcade_buttons = 12;
 static const int mk_max_mcp_arcade_buttons = 16;
 
 // Map of the gpios :                     up, down, left, right, start, select, a,  b,  tr, y,  x,  tl
-static const int mk_arcade_gpio_maps[] = { 4,  17,    27,  22,    10,    9,      25, 24, 23, 18, 15, 14 };
+static const int mk_arcade_gpio_maps[] = { 16,  5,    6,  13,    19,    26,     21, 20, 23, 12, 15, 14};
 // 2nd joystick on the b+ GPIOS                 up, down, left, right, start, select, a,  b,  tr, y,  x,  tl
 static const int mk_arcade_gpio_maps_bplus[] = { 11, 5,    6,    13,    19,    26,     21, 20, 16, 12, 7,  8 };
-// Map of the mcp23017 on GPIOA            up, down, left, right, start, select, a,	 b
-static const int mk_arcade_gpioa_maps[] = { 0,  1,    2,    3,     4,     5,	6,	 7 };
+// Map of the mcp23017 on GPIOA            up, down, left, right, start, select, a,     b
+static const int mk_arcade_gpioa_maps[] = { 0,  1,    2,    3,     4,     5,    6,     7 };
 
 // Map of the mcp23017 on GPIOB            tr, y, x, tl, c, tr2, z, tl2
 static const int mk_arcade_gpiob_maps[] = { 0, 1, 2,  3, 4, 5,   6, 7 };
@@ -195,7 +199,7 @@ static const int mk_arcade_gpiob_maps[] = { 0, 1, 2,  3, 4, 5,   6, 7 };
 static const int mk_arcade_gpio_maps_tft[] = { 21, 13,    26,    19,    5,    6,     22, 4, 20, 17, 27,  16 };
 
 static const short mk_arcade_gpio_btn[] = {
-	BTN_START, BTN_SELECT, BTN_A, BTN_B, BTN_TR, BTN_Y, BTN_X, BTN_TL, BTN_C, BTN_TR2, BTN_Z, BTN_TL2
+    KEY_DOWN, KEY_UP, KEY_RIGHT, KEY_LEFT, KEY_LEFTMETA, KEY_MENU, KEY_ENTER, KEY_ESC, KEY_PAGEUP, KEY_TAB, KEY_SPACE, KEY_PAGEDOWN, BTN_C, BTN_TR2, BTN_Z, BTN_TL2
 };
 
 static const char *mk_names[] = {
@@ -327,18 +331,18 @@ static void mk_gpio_read_packet(struct mk_pad * pad, unsigned char *data) {
 static void mk_input_report(struct mk_pad * pad, unsigned char * data) {
     struct input_dev * dev = pad->dev;
     int j;
-    input_report_abs(dev, ABS_Y, !data[0]-!data[1]);
-    input_report_abs(dev, ABS_X, !data[2]-!data[3]);
-	if (pad->type == MK_ARCADE_MCP23017) {	// check if MCP23017 and extend with 4.
-		for (j = 4; j < (mk_max_mcp_arcade_buttons); j++) {
-			input_report_key(dev, mk_arcade_gpio_btn[j - 4], data[j]);
-		}
-	}
-	else {
-		for (j = 4; j < mk_max_arcade_buttons; j++) {
-			input_report_key(dev, mk_arcade_gpio_btn[j - 4], data[j]);
-		}
-	}
+    if (pad->type == MK_ARCADE_MCP23017) {    // check if MCP23017 and extend with 4.
+        input_report_abs(dev, ABS_Y, !data[0]-!data[1]);
+        input_report_abs(dev, ABS_X, !data[2]-!data[3]);
+        for (j = 4; j < (mk_max_mcp_arcade_buttons); j++) {
+            input_report_key(dev, mk_arcade_gpio_btn[j - 4], data[j]);
+        }
+    }
+    else {
+        for (j = 0; j < mk_max_arcade_buttons; j++) {
+            input_report_key(dev, mk_arcade_gpio_btn[j], data[j]);
+        }
+    }
     input_sync(dev);
 }
 
@@ -366,8 +370,13 @@ static void mk_process_packet(struct mk *mk) {
  * mk_timer() initiates reads of console pads data.
  */
 
+#ifdef HAVE_TIMER_SETUP
+static void mk_timer(struct timer_list *t) {
+    struct mk *mk = from_timer(mk, t, timer);
+#else
 static void mk_timer(unsigned long private) {
     struct mk *mk = (void *) private;
+#endif
     mk_process_packet(mk);
     mod_timer(&mk->timer, jiffies + MK_REFRESH_TIME);
 }
@@ -453,19 +462,19 @@ static int __init mk_setup_pad(struct mk *mk, int idx, int pad_type_arg) {
     input_dev->open = mk_open;
     input_dev->close = mk_close;
 
-    input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+    input_dev->evbit[0] = BIT_MASK(EV_KEY); // | BIT_MASK(EV_ABS);
 
-    for (i = 0; i < 2; i++)
-        input_set_abs_params(input_dev, ABS_X + i, -1, 1, 0, 0);
-	if (pad_type != MK_ARCADE_MCP23017)
-	{
-		for (i = 0; i < mk_max_arcade_buttons; i++)
-			__set_bit(mk_arcade_gpio_btn[i], input_dev->keybit);
-	}
-	else { //Checking for MCP23017 so it gets 4 more buttons registered to it.
-		for (i = 0; i < mk_max_mcp_arcade_buttons; i++)
-			__set_bit(mk_arcade_gpio_btn[i], input_dev->keybit);
-	}
+//    for (i = 0; i < 2; i++)
+//        input_set_abs_params(input_dev, ABS_X + i, -1, 1, 0, 0);
+    if (pad_type != MK_ARCADE_MCP23017)
+    {
+        for (i = 0; i < mk_max_arcade_buttons; i++)
+            __set_bit(mk_arcade_gpio_btn[i], input_dev->keybit);
+    }
+    else { //Checking for MCP23017 so it gets 4 more buttons registered to it.
+        for (i = 0; i < mk_max_mcp_arcade_buttons; i++)
+            __set_bit(mk_arcade_gpio_btn[i], input_dev->keybit);
+    }
 
     mk->pad_count[pad_type]++;
 
@@ -545,7 +554,11 @@ static struct mk __init *mk_probe(int *pads, int n_pads) {
     }
 
     mutex_init(&mk->mutex);
+#ifdef HAVE_TIMER_SETUP
+    timer_setup(&mk->timer, mk_timer, 0);
+#else
     setup_timer(&mk->timer, mk_timer, (long) mk);
+#endif
 
     for (i = 0; i < n_pads && i < MK_MAX_DEVICES; i++) {
         if (!pads[i])
